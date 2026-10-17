@@ -1,0 +1,31 @@
+name: Validate SmartBiz
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Check service worker syntax
+        run: node --check sw.js
+      - name: Validate manifest and required PWA files
+        run: node -e "const fs=require('fs'); const m=JSON.parse(fs.readFileSync('manifest.webmanifest','utf8')); if(!m.name||!m.start_url||!m.icons?.length) process.exit(1); for(const p of ['index.html','manifest.webmanifest','sw.js','icon.svg','privacy.html']) if(!fs.existsSync(p)) throw new Error('Missing '+p); console.log('PWA manifest and app-shell files are valid.')"
+      - name: Check app features and document structure
+        run: |
+          node - <<'NODE'
+          const fs = require('fs');
+          const html = fs.readFileSync('index.html', 'utf8');
+          for (const needle of ['id="saleForm"', 'id="stockForm"', 'id="expenseForm"', 'id="reportExport"', 'serviceWorker.register', 'manifest.webmanifest']) {
+            if (!html.includes(needle)) throw new Error('Missing required app feature: ' + needle);
+          }
+          if (!/<\/html>\s*$/i.test(html)) throw new Error('HTML document does not close correctly.');
+          console.log('Required app forms and PWA references found.');
+          NODE
